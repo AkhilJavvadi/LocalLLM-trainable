@@ -82,7 +82,7 @@ The project is divided into two main parts: a .NET Core backend and a React fron
 
 ## Sample Trained Model
 
-The Folder is available in - 'https://drive.google.com/drive/folders/15ejxwmhGtv4B4eKMHm_WbErhy3Vdqyd_?usp=sharing'
+The Folder is available in - https://drive.google.com/drive/folders/1i5IjiYLuX7-_86CgbguvKzBhFyq-kt8l?usp=sharing
 
 Place the runs folder inside the LocalLLM.API folder
 
