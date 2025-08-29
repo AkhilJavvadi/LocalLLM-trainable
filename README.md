@@ -33,7 +33,7 @@ The project is divided into two main parts: a .NET Core backend and a React fron
 
 ### Prerequisites
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - [Node.js](https://nodejs.org/)
 - [Python](https://www.python.org/)
 - [Ollama](https://ollama.ai/)
