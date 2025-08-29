@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("LocalLLM.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3354d54edf205df405f3bb1a351cdf09f48ba910")]
 [assembly: System.Reflection.AssemblyProductAttribute("LocalLLM.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("LocalLLM.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -1,6 +1,5 @@
 {
   "name": "localllm-react-chat",
-  "description": "A React chat application for the LocalLLM project.",
   "private": true,
   "version": "0.1.0",
   "type": "module",
