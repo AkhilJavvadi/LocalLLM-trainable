@@ -82,6 +82,10 @@ The project is divided into two main parts: a .NET Core backend and a React fron
 
 ## Sample Trained Model
 
+The Folder is available in - 'https://drive.google.com/drive/folders/15ejxwmhGtv4B4eKMHm_WbErhy3Vdqyd_?usp=sharing'
+
+Place the runs folder inside the LocalLLM.API folder
+
 The project includes a sample trained model. To use it, run the following commands:
 
 ```bash
