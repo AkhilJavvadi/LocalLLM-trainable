@@ -53,6 +53,10 @@ The project is divided into two main parts: a .NET Core backend and a React fron
    ```bash
    pip install -r requirements.txt
    ```
+5. Install the Llama3 model using ollama:
+   ```bash
+   ollama pull llama3:8b
+   ```
 
 ### Running the Application
 

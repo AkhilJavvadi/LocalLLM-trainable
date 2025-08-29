@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LocalLLM Trainable - Deep Technical Documentation</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.6; color: #24292e; max-width: 1024px; margin: 2rem auto; padding: 2rem; }
+        h1, h2, h3, h4 { border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; margin-top: 24px; margin-bottom: 16px; font-weight: 600; }
+        code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; background-color: rgba(27,31,35,.05); padding: 0.2em 0.4em; margin: 0; font-size: 85%; border-radius: 3px; }
+        pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace; background-color: #f6f8fa; padding: 16px; overflow: auto; border-radius: 6px; line-height: 1.45; }
+        .purpose { font-style: italic; color: #586069; margin-bottom: 1em; }
+        .code-block-title { font-weight: 600; margin-bottom: -10px; margin-top: 10px; background-color: #f6f8fa; display: inline-block; padding: 2px 8px; border-top-left-radius: 6px; border-top-right-radius: 6px; border: 1px solid #e1e4e8; border-bottom: none; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>Deep Dive: The LocalLLM Trainable Project</h1>
+
+    <h2>1. What We Built (High-Level)</h2>
+    <p><strong>Goal:</strong> A self-hosted, full-stack application that allows a user to chat with local Large Language Models (LLMs) and fine-tune them with custom data via a simple web interface.</p>
+    
+    <h4>Flow 1: Chat Request Lifecycle</h4>
+    <p>[React UI] &rarr; POST /api/chat &rarr; [ChatController] &rarr; [OllamaRunner Service] &rarr; [Ollama REST API] &rarr; [Service streams response] &rarr; [Controller streams to UI] &rarr; [React UI displays tokens]</p>
+
+    <h4>Flow 2: Training Job Lifecycle</h4>
+    <p>[React UI] &rarr; POST /api/train &rarr; [TrainController] &rarr; [PythonTrainer Service] &rarr; (Generates config.yaml) &rarr; [Executes train.py process] &rarr; (UI polls for status) &rarr; [Controller returns log tail] &rarr; [React UI displays progress]</p>
+
+    <h2>2. Project Layout</h2>
+    <pre>
+E:/Internship/LocalLLM_trainable/
+├─── LocalLLM.API/      (The .NET Core backend server)
+├─── LocalLLM.React.Chat/ (The React frontend application)
+├─── requirements.txt     (Python dependencies for the training script)
+└─── ...
+    </pre>
+
+    <h2>3. Backend (ASP.NET Core API)</h2>
+
+    <h4>3.1 Services/OllamaRunner.cs</h4>
+    <p class="purpose">Purpose: To encapsulate all direct communication with the Ollama engine, acting as a clean client for model inference.</p>
+    <p><strong>What it does:</strong></p>
+    <ul>
+        <li>Receives an <code>HttpClient</code> configured by the .NET framework.</li>
+        <li><strong><code>GenerateAsync</code>:</strong> This is the core inference method. It builds the JSON payload required by Ollama's <code>/api/generate</code> endpoint, including the model name, prompt, and streaming flag. It then reads the response stream token-by-token and yields each piece of text back to the controller.</li>
+        <li><strong><code>LoadAsync</code>:</strong> Checks if a model exists locally using Ollama's <code>/api/tags</code> endpoint. If not, it calls the <code>/api/pull</code> endpoint to download it, ensuring the requested model is available before inference.</li>
+    </ul>
+    <p><strong>Core Ideas Explained:</strong></p>
+    <ul>
+        <li><strong>Why <code>IAsyncEnumerable&lt;string&gt;</code>?</strong> This return type is perfect for streaming. It allows the controller to start sending the response to the user the moment the first token arrives, instead of waiting for the entire generation to complete. This dramatically improves perceived performance.</li>
+        <li><strong>Why <code>HttpClient</code> with <code>Timeout.InfiniteTimeSpan</code>?</strong> Model generation can be slow. Setting an infinite timeout prevents the request from failing prematurely during a long inference task.</li>
+    </ul>
+
+    <h4>3.2 Services/PythonTrainer.cs</h4>
+    <p class="purpose">Purpose: To orchestrate the execution of the external Python training script, bridging the gap between the .NET web world and the Python ML world.</p>
+    <p><strong>What it does:</strong></p>
+    <ul>
+        <li><strong><code>LaunchAsync</code>:</strong> When a training job starts, this method:
+            <ol>
+                <li>Creates a unique directory for the job under <code>/runs/{jobId}</code>.</li>
+                <li>Writes a <code>config.yaml</code> file into that directory. This file contains all the necessary parameters for the Python script, such as the dataset path, base model, and learning rate.</li>
+                <li>Starts a new <code>System.Diagnostics.Process</code> to run <code>python -u train.py</code>, pointing it to the generated config file.</li>
+                <li>Attaches event handlers (<code>OutputDataReceived</code>, <code>ErrorDataReceived</code>) to the process to capture its console output in real-time and write it to a <code>train.log</code> file.</li>
+            </ol>
+        </li>
+        <li><strong><code>Status</code>:</strong> Checks if the process associated with a <code>jobId</code> is still running. It reads the last ~16KB of the log file to provide a "tail" of the latest progress to the frontend.</li>
+    </ul>
+    <p><strong>Core Ideas Explained:</strong></p>
+    <ul>
+        <li><strong>Why a separate Python script?</strong> It leverages the best-in-class Python ecosystem for machine learning (PyTorch, Hugging Face Transformers, PEFT) without trying to reinvent the wheel in C#. This is a common and robust architectural pattern.</li>
+        <li><strong>Why <code>config.yaml</code>?</strong> Passing parameters via a configuration file is cleaner and more extensible than using a long string of command-line arguments.</li>
+        <li><strong>Why <code>python -u</code>?</strong> The <code>-u</code> flag forces Python's output streams to be unbuffered, which is essential for the C# process to capture log output in real-time.</li>
+    </ul>
+
+    <h4>3.3 Controllers/ChatController.cs & TrainController.cs</h4>
+    <p class="purpose">Purpose: To define the HTTP API "surface area" for the frontend, handling incoming requests and calling the appropriate backend services.</p>
+    <ul>
+        <li><strong><code>[ApiController]</code> and <code>[Route("api/[controller]")]</code>:</strong> Standard attributes that enable automatic model binding, validation, and set the URL pattern (e.g., <code>/api/chat</code>).</li>
+        <li><strong><code>[HttpPost]</code>, <code>[HttpGet("{jobId}")]</code>:</strong> Attributes that map specific HTTP methods and URL patterns to controller actions.</li>
+        <li>The controllers are intentionally "thin." Their job is to validate the request, call the relevant service method (e.g., <code>_trainer.LaunchAsync(...)</code>), and format the response. All the heavy lifting is done in the service layer.</li>
+    </ul>
+
+    <h2>4. Frontend (React)</h2>
+
+    <h4>4.1 .env.sample and Vite Configuration</h4>
+    <p class="purpose">Purpose: To manage the backend API's location without hardcoding it, allowing for different URLs in development vs. production.</p>
+    <p>The frontend does not use a proxy. Instead, it relies on an environment variable:</p>
+    <div class="code-block-title">.env</div>
+    <pre><code>VITE_API_BASE=http://localhost:5000</code></pre>
+    <p>This variable is read in <code>api.ts</code> to prefix all API calls. This is a clean, explicit way to handle cross-origin requests during development.</p>
+
+    <h4>4.2 src/lib/api.ts</h4>
+    <p class="purpose">Purpose: To create a strongly-typed, reusable client for all backend API interactions.</p>
+    <p><strong>What it does:</strong></p>
+    <ul>
+        <li><strong><code>streamChat</code>:</strong> Uses the browser's native <code>fetch</code> API. Crucially, it gets a reader from <code>res.body.getReader()</code> and uses a <code>TextDecoder</code> to decode the incoming raw byte stream into readable text. It uses an async generator (<code>async function*</code>) to yield each decoded chunk as it arrives.</li>
+        <li><strong><code>launchTraining</code> & <code>getTrainingStatus</code>:</strong> Standard <code>fetch</code> calls that send JSON and expect JSON in return, providing a clean async/await interface for the UI components.</li>
+    </ul>
+
+    <h4>4.3 src/components/ChatWindow.tsx</h4>
+    <p class="purpose">Purpose: To provide the main chat UI, manage conversation state, and render the streaming AI response.</p>
+    <p>When a user sends a message, the component calls <code>streamChat</code> and iterates over the resulting async generator. For each token yielded by the generator, it updates the component's state, appending the new token to the last message in the conversation array. This state update triggers a re-render, making the text appear on screen in real-time.</p>
+
+    <h2>5. Payloads & Data Structures</h2>
+    
+    <h4>5.1 Ollama Request (Simplified)</h4>
+    <p>The JSON payload sent from <code>OllamaRunner.cs</code> to the Ollama engine's <code>/api/generate</code> endpoint.</p>
+    <pre><code>{
+  "model": "llama3:8b",
+  "prompt": "Your prompt here...",
+  "stream": true
+}</code></pre>
+
+    <h4>5.2 Python Trainer Configuration</h4>
+    <p>An example <code>config.yaml</code> generated by <code>PythonTrainer.cs</code> for a training job.</p>
+    <pre><code>dataset_path: "C:/path/to/data/dataset.jsonl"
+base_model: "llama3:8b"
+epochs: 3
+learning_rate: 0.0002
+output_dir: "E:/Internship/LocalLLM_trainable/LocalLLM.API/runs/20250829120000/artifacts"
+</code></pre>
+
+    <h2>6. How to Run (Local Dev)</h2>
+    <p>Open two terminals:</p>
+    <p><strong>Terminal A &ndash; Backend</strong></p>
+    <pre><code>cd LocalLLM.API
+dotnet run</code></pre>
+    <p><strong>Terminal B &ndash; Frontend</strong></p>
+    <pre><code>cd LocalLLM.React.Chat
+npm install  # Only needed the first time
+npm run dev</code></pre>
+    <p>Navigate to the localhost URL provided by the frontend terminal (usually http://localhost:5173).</p>
+
+    <h2>7. Common Issues & Quick Fixes</h2>
+    <ul>
+        <li><strong>Error: "Connection refused" in browser console.</strong><br/>The frontend cannot reach the backend. Ensure the backend is running and that the URL in your <code>.env</code> file (<code>VITE_API_BASE</code>) matches the URL the backend is listening on.</li>
+        <li><strong>Error: Ollama model not found.</strong><br/>Ensure the Ollama desktop application or server is running. The backend will attempt to pull the model on first use, but this requires Ollama to be accessible.</li>
+        <li><strong>Training job fails immediately.</strong><br/>Check the <code>train.log</code> file inside the latest directory in <code>LocalLLM.API/runs/</code>. This will contain the full Python error. The most common cause is a missing Python dependency (run <code>pip install -r requirements.txt</code>) or an issue with the CUDA/GPU environment.</li>
+    </ul>
+
+</body>
+</html>
